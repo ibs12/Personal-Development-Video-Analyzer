@@ -1,0 +1,10 @@
+.scroll-area {
+    max-height: 300px;
+    overflow-y: auto;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    background-color: #fff;
+  }
+
+  
