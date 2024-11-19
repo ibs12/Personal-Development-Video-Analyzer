@@ -43,12 +43,15 @@ murmurhash==1.0.10
 mutagen==1.47.0
 networkx==3.3
 nltk==3.9.1
+node==1.2.2
 numba==0.60.0
 numpy==2.0.2
+odict==1.9.0
 openai-whisper==20231117
 optional-django==0.3.0
 packaging==24.1
 pillow==10.4.0
+plumber==1.7
 preshed==3.0.9
 proto-plus==1.25.0
 protobuf==5.28.3
@@ -97,3 +100,11 @@ Werkzeug==3.0.3
 wrapt==1.16.0
 youtube-transcript-api==0.6.2
 yt-dlp==2024.11.4
+zope.component==6.0
+zope.deferredimport==5.0
+zope.deprecation==5.0
+zope.event==5.0
+zope.hookable==7.0
+zope.interface==7.1.1
+zope.lifecycleevent==5.0
+zope.proxy==6.1

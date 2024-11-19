@@ -102,7 +102,6 @@ if __name__ == "__main__":
 # # Load the spaCy model
 # nlp = spacy.load("en_core_web_sm")
 
-# # Sample transcript (replace with actual text)
 # transcript = """
 # Welcome to today's session on building confidence. First, you should always start by challenging negative thoughts. For example, when you think "I'm not good enough," try to counter it by recalling times you succeeded. 
 # Now, let's move to the next step: daily affirmations. To improve your mindset, spend a few minutes every morning affirming your strengths. 

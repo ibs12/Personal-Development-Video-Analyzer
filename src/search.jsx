@@ -105,9 +105,7 @@ const handleSubmit = async (event) => {
     
     const analysisData = processResponse.data;
     
-    // Check if we got a successful response
     if (analysisData.status === 'success') {
-      // Convert action steps from objects to strings for display
       const actionStepsArray = analysisData.data.action_steps.map(
         step => `${step.action}${step.explanation ? `: ${step.explanation}` : ''}`
       );
@@ -115,7 +113,7 @@ const handleSubmit = async (event) => {
       setAnalysisResult({
         action_steps: actionStepsArray,
         key_insights: analysisData.data.key_insights || [],
-        important_analogies: analysisData.data.analogies || [], // Note: changed from important_analogies to analogies
+        important_analogies: analysisData.data.analogies || [], 
         summary: analysisData.data.summary || ''
       });
     } else {

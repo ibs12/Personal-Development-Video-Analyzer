@@ -78,12 +78,9 @@ class PersonalDevelopmentProcessor:
     def _extract_json_from_response(self, text: str) -> dict:
         """Extract JSON from the response text, handling potential formatting issues."""
         try:
-            # Try to parse the text directly first
             return json.loads(text)
         except json.JSONDecodeError:
-            # If that fails, try to find JSON within the text
             try:
-                # Find anything that looks like JSON (between curly braces)
                 json_match = re.search(r'\{.*\}', text, re.DOTALL)
                 if json_match:
                     return json.loads(json_match.group())
@@ -112,7 +109,6 @@ class PersonalDevelopmentProcessor:
                     "message": "Failed to parse AI response. Please try again."
                 }
 
-            # Process action steps with validation
             action_steps = []
             for action_data in parsed_response.get('action_steps', []):
                 if isinstance(action_data, dict):
@@ -141,7 +137,6 @@ class PersonalDevelopmentProcessor:
             }
 
 if __name__ == "__main__":
-    # Test the processor with a sample transcript
     sample_transcript = "This is a test transcript..."
     processor = PersonalDevelopmentProcessor(api_key=os.getenv('API_KEY'))
     result = processor.process_transcript(sample_transcript)
