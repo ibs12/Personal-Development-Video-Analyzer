@@ -1,12 +1,15 @@
 import sys
 import logging
-from pytube import YouTube
-from pytubefix import YouTube
-from pytubefix.cli import on_progress
-import whisper
-from pydub import AudioSegment
+# from pytube import YouTube
+# from pytubefix import YouTube
+# from pytubefix.cli import on_progress
+# import whisper
+# from pydub import AudioSegment
 import os
 from transformers import BartForConditionalGeneration, BartTokenizer
+from youtube_transcript_api import YouTubeTranscriptApi
+import json
+
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(message)s')
@@ -69,32 +72,38 @@ logger = logging.getLogger()
 
 from youtube_transcript_api import YouTubeTranscriptApi
 
+import json
+
 def get_transcript(video_id):
     try:
         # Fetch transcript using YouTubeTranscriptApi
         transcript = YouTubeTranscriptApi.get_transcript(video_id)
         
+        # Save combined text to a file
         combined_text = ' '.join(part['text'] for part in transcript)
-        
         with open("transcript.txt", "w") as file:
             file.write(combined_text)
-        return transcript
+
+        # Return structured transcript as JSON
+        return json.dumps(transcript)  # Ensure valid JSON output
     except Exception as e:
         print(f"An error occurred: {e}")
         return None
 
-
-
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO, format='%(message)s')
+    import sys
 
     if len(sys.argv) != 2:
-        logger.error("Usage: python transcribe.py <YouTubeURL>")
+        print(json.dumps({"error": "Usage: python transcribe.py <YouTubeVideoID>"}))
         sys.exit(1)
 
-    youtube_url = sys.argv[1]
-    transcript = get_transcript(youtube_url)
-    print(transcript)
+    youtube_id = sys.argv[1]
+    transcript = get_transcript(youtube_id)
+    if transcript:
+        print(transcript)
+    else:
+        print(json.dumps({"error": "Failed to fetch transcript."}))
+
     
 # import re
 # import spacy
