@@ -10,7 +10,8 @@ import {
   Loader2,
   BrainCircuit,
   ListTodo,
-  Quote
+  Quote,
+  Search
 } from 'lucide-react';
 
 
@@ -97,7 +98,7 @@ const PersonalDevInsightsApp = () => {
             timestamp: step.timestamp,
           })),
           keyInsights: analysisData.data.key_insights || [],
-          importantAnalogies: analysisData.data.analogies || [],
+          importantExamples: analysisData.data.examples || [],
           summary: analysisData.data.summary || '',
         });
       } else {
@@ -137,30 +138,38 @@ const PersonalDevInsightsApp = () => {
   };
   // max-w-6xl mx-auto p-6 bg-white shadow-lg rounded-xl
   return (
-    <div className="mx-10 p-6 bg-white">
+    <div className=" h-screen p-5 bg-white">
       <header className="mb-6 text-center">
-        <h1 className="text-3xl font-bold text-blue-600 mb-4">
+        <h1 className="text-3xl font-bold text-neutral-800 mb-4">
           Personal Development Insights Extractor
         </h1>
       </header>
 
       <section className="mb-6">
-        <div className="flex items-center space-x-4">
-          <input 
-            type="text" 
-            value={videoUrl}
-            onChange={(e) => setVideoUrl(e.target.value)}
-            placeholder="Paste YouTube video URL"
-            className="flex-grow p-3 border-2 border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
-          />
-          <button 
-            onClick={handleVideoSubmission}
-            disabled={!videoUrl || isLoading}
-            className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 disabled:opacity-50"
-          >
-            {isLoading ? 'Analyzing...' : 'Extract Insights'}
-          </button>
-        </div>
+      <div className="flex items-center space-x-4">
+        <form 
+          onSubmit={handleVideoSubmission} 
+          className="relative w-[600px] mx-auto" // Significantly wider
+        >
+          <div className="flex items-center bg-white rounded-full pr-4"> {/* Slightly more padding */}
+            <div className="absolute left-5 top-1/2 transform -translate-y-1/2">
+              <Search 
+                className="text-neutral-800 cursor-pointer" 
+                onClick={handleVideoSubmission}
+                size={32} 
+              />
+            </div>
+            <input 
+              type="text" 
+              value={videoUrl}
+              onChange={(e) => setVideoUrl(e.target.value)}
+              placeholder="Paste YouTube video URL"
+              className="w-full pl-16 pr-6 py-5 text-3xl bg-transparent text-neutral-800 placeholder-neutral-400 focus:outline-none" 
+              // Increased padding, text size, and left padding for icon
+            />
+          </div>
+        </form>
+      </div>
         {error && (
           <div className="text-red-500 mt-2">
             {error}
@@ -220,7 +229,7 @@ const PersonalDevInsightsApp = () => {
           {/* Insights Sections */}
           <div className="md:col-span-1 space-y-6 h-[90vh] overflow-y-scroll">
             {/* Action Steps Section */}
-            <section className="bg-blue-50 p-5 rounded-lg">
+            <section className="bg-gradient-to-r from-[#87CEEB] to-[#B0C4DE] p-5 rounded-lg">
               <h2 className="flex items-center text-xl font-semibold text-blue-700 mb-4">
                 <BookmarkIcon className="mr-2" /> Action Steps
               </h2>
@@ -233,9 +242,10 @@ const PersonalDevInsightsApp = () => {
                   {step.timestamp && (
                     <button
                       onClick={() => handleTimestampClick(step.timestamp)}
-                      className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600"
+                      className="bg-white text-blue-500 px-3 py-1 rounded hover:bg-white-600 text-lg font-semibold"
                     >
-                      Go to {Math.floor((step.timestamp) / 60)}.{Math.round(step.timestamp % 60)}
+                      {/* {Math.floor((step.timestamp) / 60)}.{Math.round(step.timestamp % 60)} */}
+                      {new Date(step.timestamp * 1000).toISOString().substr(14, 5)}
 
                     </button>
                   )}
@@ -258,9 +268,9 @@ const PersonalDevInsightsApp = () => {
                     {insight.timestamp && (
                       <button
                         onClick={() => handleTimestampClick(insight.timestamp)}
-                        className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600"
+                        className="bg-white text-blue-500 px-3 py-1 rounded hover:bg-white-600 text-lg font-semibold"
                       >
-                        Go to {Math.floor((insight.timestamp) / 60)}.{Math.round(insight.timestamp % 60)}
+                      {new Date(insight.timestamp * 1000).toISOString().substr(14, 5)}
 
                       </button>
                     )}
@@ -269,14 +279,14 @@ const PersonalDevInsightsApp = () => {
               </ul>
             </section>
             
-            {/* Important Analogies Section */}
+            {/* Important Examples Section */}
             <section className="bg-green-50 p-5 rounded-lg">
               <h2 className="flex items-center text-xl font-semibold text-green-700 mb-4">
-                <Quote className="mr-2" /> Important Analogies
+                <Quote className="mr-2" /> Important Examples
               </h2>
               <ul className="list-disc ml-5 text-gray-700">
-                {insights.importantAnalogies.map((analogy, index) => (
-                  <li key={index}>{analogy.analogy || analogy}</li>
+                {insights.importantExamples.map((example, index) => (
+                  <li key={index}>{example.example || example}</li>
                 ))}
               </ul>
             </section>

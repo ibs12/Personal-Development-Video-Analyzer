@@ -19,15 +19,15 @@ class KeyInsight:
     timestamp: str = ""
 
 @dataclass
-class Analogy:
-    analogy: str
+class Example:
+    example: str
     timestamp: str = ""
 
 @dataclass
 class ProcessedContent:
     action_steps: List[ActionItem]
     key_insights: List[KeyInsight]
-    analogies: List[Analogy]
+    examples: List[Example]
     summary: str
 
     def to_dict(self) -> Dict[str, Any]:
@@ -48,12 +48,12 @@ class ProcessedContent:
                 }
                 for insight in self.key_insights
             ],
-            "analogies": [
+            "examples": [
                 {
-                    "analogy": analogy.analogy,
-                    "timestamp": analogy.timestamp
+                    "example": example.example,
+                    "timestamp": example.timestamp
                 }
-                for analogy in self.analogies
+                for example in self.examples
             ]
         }
 
@@ -72,51 +72,69 @@ class PersonalDevelopmentProcessor:
     def _create_summary_prompt(self, transcript: str) -> str:
         return f"""
         You are an expert in personal development content analysis. Review this transcript and provide:
-        1. A concise summary focused on actionable insights
-        2. The main message and key takeaways
-        
+        1. The main message and key takeaways
+                
         Transcript:
         {transcript}
         """
+        
 
     def _create_action_prompt(self, transcript: str) -> str:
         return f"""
-        Analyze this personal development content and provide a response in the exact JSON format shown below. Do not include any additional text, markdown, or explanations outside the JSON structure.
+    Analyze the following personal development content and extract the required information in the exact JSON format shown below. Ensure that:
+    - Responses adhere strictly to the JSON structure.
+    - No additional text, markdown, or explanations are included outside the JSON structure.
+    - Each action step is concrete, practical, and immediately implementable.
 
-        Required JSON format:
-        {{
-            "action_steps": [
-                {{
-                    "action": "Specific action to take",
-                    "explanation": "Brief explanation of how to implement this action",
-                    "timestamp": "Timestamp in the video using the transcript to locate the action"
-                }}
-            ],
-            "key_insights": [
-                {{  "keyInsight": "Key Insight 1", 
-                    "timestamp": "Timestamp in the video using the transcript to locate the key insight"
-                }},
-                {{  "keyInsight": "Key Insight 2", 
-                    "timestamp": "Timestamp in the video using the transcript to locate the key insight"
-                }}
-            ],
-            "analogies": [
-                {{  "analogy": "Analogy 1", 
-                    "timestamp": "Timestamp in the video using the transcript to locate the analogy"
-                }},
-                {{  "analogy": "Analogy 2", 
-                    "timestamp": "Timestamp in the video using the transcript to locate the analogy"
-                }}
-            ]
-        }}
+    Required JSON format:
+    {{
+        "action_steps": [
+            {{
+                "action": "Specific action to take or not to take",
+                "explanation": "Brief explanation of how to implement this action or why not to take a certain action",
+                "timestamp": "Timestamp in the video using the transcript to locate the action"
+            }}
+        ],
+        "key_insights": [
+            {{
+                "keyInsight": "A significant insight that is not an action but a key point to remember",
+                "timestamp": "Timestamp in the video using the transcript to locate the key insight"
+            }}
+        ],
+        "examples": [
+            {{
+                "example": "An example illustrating a concept or action mentioned in the content",
+                "timestamp": "Timestamp in the video using the transcript to locate the example"
+            }}
+        ]
+    }}
 
-        Make each action step concrete and immediately implementable. Focus on practical steps.
-        
-        Analyze this transcript:
-        {transcript}
+    Example response:
+    {{
+        "action_steps": [
+            {{
+                "action": "Start practicing mindfulness for 5 minutes daily",
+                "explanation": "Helps improve focus and reduce stress. Start by setting aside 5 minutes each morning.",
+                "timestamp": "2548.546"
+            }}
+        ],
+        "key_insights": [
+            {{
+                "keyInsight": "Mindfulness can rewire your brain for better focus and emotional regulation",
+                "timestamp": "1548.687"
+            }}
+        ],
+        "examples": [
+            {{
+                "example": "Try a simple breathing exercise, inhaling for 4 seconds and exhaling for 4 seconds",
+                "timestamp": "436.7576"
+            }}
+        ]
+    }}
 
-        Respond only with the JSON structure above.
-        """
+    Now, analyze this transcript and provide your response in the required JSON format:
+    {transcript}
+    """
 
     def _extract_json_from_response(self, text: str) -> dict:
         """Extract JSON from the response text, handling potential formatting issues."""
@@ -171,18 +189,18 @@ class PersonalDevelopmentProcessor:
                 for item in parsed_response.get('key_insights', [])
             ]
 
-            analogies = [
-                Analogy(
-                    analogy=item.get('analogy', ''),
+            examples = [
+                Example(
+                    example=item.get('example', ''),
                     timestamp=item.get('timestamp', '')
                 )
-                for item in parsed_response.get('analogies', [])
+                for item in parsed_response.get('examples', [])
             ]
 
             processed_content = ProcessedContent(
                 action_steps=action_steps,
                 key_insights=key_insights,
-                analogies=analogies,
+                examples=examples,
                 summary=summary
             )
             
