@@ -149,7 +149,7 @@ const PersonalDevInsightsApp = () => {
       <div className="flex items-center space-x-4">
         <form 
           onSubmit={handleVideoSubmission} 
-          className="relative w-[600px] mx-auto" // Significantly wider
+          className="relative w-[450px] mx-auto" // Significantly wider
         >
           <div className="flex items-center bg-white rounded-full pr-4"> {/* Slightly more padding */}
             <div className="absolute left-5 top-1/2 transform -translate-y-1/2">
@@ -171,7 +171,7 @@ const PersonalDevInsightsApp = () => {
         </form>
       </div>
         {error && (
-          <div className="text-red-500 mt-2">
+          <div className="text-red-500 mt-2 flex justify-center">
             {error}
           </div>
         )}
