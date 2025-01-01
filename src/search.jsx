@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
+import './search.css';
 import { 
   BookmarkIcon, 
   PlayIcon, 
@@ -11,7 +12,9 @@ import {
   BrainCircuit,
   ListTodo,
   Quote,
-  Search
+  Search,
+  MenuIcon,
+  StarIcon
 } from 'lucide-react';
 
 
@@ -138,7 +141,7 @@ const PersonalDevInsightsApp = () => {
   };
   // max-w-6xl mx-auto p-6 bg-white shadow-lg rounded-xl
   return (
-    <div className=" h-screen p-5 bg-white">
+    <div className="h-screen p-5 bg-inherit overflow-y-scroll">
       <header className="mb-6 text-center">
         <h1 className="text-3xl font-bold text-neutral-800 mb-4">
           Personal Development Insights Extractor
@@ -146,30 +149,77 @@ const PersonalDevInsightsApp = () => {
       </header>
 
       <section className="mb-6">
-      <div className="flex items-center space-x-4">
-        <form 
-          onSubmit={handleVideoSubmission} 
-          className="relative w-[450px] mx-auto" // Significantly wider
-        >
-          <div className="flex items-center bg-white rounded-full pr-4"> {/* Slightly more padding */}
-            <div className="absolute left-5 top-1/2 transform -translate-y-1/2">
-              <Search 
-                className="text-neutral-800 cursor-pointer" 
-                onClick={handleVideoSubmission}
-                size={32} 
-              />
-            </div>
-            <input 
-              type="text" 
-              value={videoUrl}
-              onChange={(e) => setVideoUrl(e.target.value)}
-              placeholder="Paste YouTube video URL"
-              className="w-full pl-16 pr-6 py-5 text-3xl bg-transparent text-neutral-800 placeholder-neutral-400 focus:outline-none" 
-              // Increased padding, text size, and left padding for icon
-            />
+        <div className="flex items-center w-full h-16">
+          <div className="flex-grow flex justify-center space-x-4">
+            <form 
+              onSubmit={handleVideoSubmission} 
+              className="relative w-[450px] mx-auto" // Significantly wider
+            >
+              <div className="flex items-center bg-white rounded-full pr-4"> {/* Slightly more padding */}
+                <div className="absolute left-5 top-1/2 transform -translate-y-1/2">
+                  <Search 
+                    className="text-neutral-800 cursor-pointer" 
+                    onClick={handleVideoSubmission}
+                    size={32} 
+                  />
+                </div>
+                <input 
+                  type="text" 
+                  value={videoUrl}
+                  onChange={(e) => setVideoUrl(e.target.value)}
+                  placeholder="Paste YouTube video URL"
+                  className="w-full pl-16 pr-6 py-5 text-3xl bg-transparent text-neutral-800 placeholder-neutral-400 focus:outline-none" 
+                  // Increased padding, text size, and left padding for icon
+                />
+              </div>
+            </form>
           </div>
-        </form>
-      </div>
+          <div className="flex items-center bg-white shadow-md py-4 px-6 space-x-4 text-gray-700 rounded-lg">
+            {/* Action Steps */}
+            <div className="group relative cursor-pointer">
+              <div className="flex items-center h-12 bg-gradient-to-r from-blue-400 to-blue-500 rounded-full transition-all duration-300 w-12 group-hover:w-[160px] pl-3 overflow-hidden">
+                <BookmarkIcon className="w-6 h-6 text-white shrink-0 mr-2" style={{ height: '100%', display: 'flex', alignItems: 'center'}} />
+                <span className="opacity-0 text-white whitespace-nowrap transition-opacity duration-300 group-hover:opacity-100">
+                  Action Steps
+                </span>
+              </div>
+            </div>
+
+
+            {/* Key Insights */}
+            <div className="group relative cursor-pointer">
+              <div className="flex items-center h-12 bg-gradient-to-r from-purple-400 to-purple-500 rounded-full transition-all duration-300 w-12 group-hover:w-[160px] pl-3 overflow-hidden">
+                <LightbulbIcon className="w-6 h-6 text-white shrink-0 mr-2" style={{ height: '100%', display: 'flex', alignItems: 'center'}} />
+                <span className="opacity-0 text-white whitespace-nowrap transition-opacity duration-300 group-hover:opacity-100">
+                  Key Insights
+                </span>
+              </div>
+            </div>
+
+            {/* Important Examples */}
+            <div className="group relative cursor-pointer">
+              <div className="flex items-center h-12 bg-gradient-to-r from-green-400 to-green-500 rounded-full transition-all duration-300 w-12 group-hover:w-[160px] pl-3 overflow-hidden">
+                <StarIcon className="w-6 h-6 text-white shrink-0 mr-2" style={{ height: '100%', display: 'flex', alignItems: 'center'}} />
+                <span className="opacity-0 text-white whitespace-nowrap transition-opacity duration-300 group-hover:opacity-100">
+                  Examples
+                </span>
+              </div>
+            </div>
+
+            {/* Summary */}
+            <div className="group relative cursor-pointer">
+              <div className="flex items-center h-12 bg-gradient-to-r from-gray-400 to-gray-500 rounded-full transition-all duration-300 w-12 group-hover:w-[160px] pl-3 overflow-hidden">
+                <MenuIcon className="w-6 h-6 text-white shrink-0 mr-2" style={{ height: '100%', display: 'flex', alignItems: 'center'}} />
+                <span className="opacity-0 text-white whitespace-nowrap transition-opacity duration-300 group-hover:opacity-100">
+                  Summary
+                </span>
+              </div>
+            </div>
+          </div>
+
+
+
+          </div>
         {error && (
           <div className="text-red-500 mt-2 flex justify-center">
             {error}
@@ -178,7 +228,7 @@ const PersonalDevInsightsApp = () => {
       </section>
 
       {videoId && insights && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="child grid grid-cols-1 md:grid-cols-2 gap-6 pb-10">
           {/* Video Player Column */}
           <div className="md:col-span-1">
             <div className="relative pb-[56.25%] h-0 overflow-hidden">
@@ -189,7 +239,7 @@ const PersonalDevInsightsApp = () => {
                 frameBorder="0"
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 allowFullScreen
-                className="absolute top-0 left-0 w-full h-full"
+                className="absolute top-0 left-0 w-full h-full rounded-3xl"
                 onLoad={() => {
                   console.log('Video iframe loaded');
                   setIsLoading(false);
@@ -254,7 +304,7 @@ const PersonalDevInsightsApp = () => {
             </section>
             
             {/* Key Insights Section */}
-            <section className="bg-purple-50 p-5 rounded-lg">
+            <section className="bg-gradient-to-r from-[#dc8efe] to-[#faf5ff] p-5 rounded-lg">
               <h2 className="flex items-center text-xl font-semibold text-purple-700 mb-4">
                 <LightbulbIcon className="mr-2" /> Key Insights
               </h2>
@@ -263,7 +313,7 @@ const PersonalDevInsightsApp = () => {
                   <div key={index} className="mb-4 p-4 bg-white rounded-lg shadow-sm flex justify-between items-center">
                     {/* <li key={index}>{insight.keyInsight || insight}</li> */}
                     <div>
-                      <h3 className="font-bold text-purple-700 mb-2 mr-5">{insight.keyInsight}</h3>
+                      <h3 className="font-bold  text-purple-700 mb-2 mr-5">{insight.keyInsight}</h3>
                     </div>
                     {insight.timestamp && (
                       <button
@@ -280,13 +330,25 @@ const PersonalDevInsightsApp = () => {
             </section>
             
             {/* Important Examples Section */}
-            <section className="bg-green-50 p-5 rounded-lg">
+            <section className="bg-gradient-to-r from-[#97e8af] to-[#f0fdf4] p-5 rounded-lg">
               <h2 className="flex items-center text-xl font-semibold text-green-700 mb-4">
                 <Quote className="mr-2" /> Important Examples
               </h2>
               <ul className="list-disc ml-5 text-gray-700">
                 {insights.importantExamples.map((example, index) => (
-                  <li key={index}>{example.example || example}</li>
+                  <div key={index} className = "mb-4 p-4 bg-white rounded-lg shadow-sm flex justify-between items-center">
+                    <div>
+                      <h3 className="font-bold text-green-700 mb-2">{example.example}</h3>
+                    </div>
+                  {example.timestamp && (
+                    <button
+                      onClick={() => handleTimestampClick(example.timestamp)}
+                      className="bg-white text-blue-500 px-3 py-1 rounded hover:bg-white-600 text-lg font-semibold"
+                    >
+                      {new Date(example.timestamp * 1000).toISOString().substr(14, 5)}
+                    </button>
+                  )}
+                </div>
                 ))}
               </ul>
             </section>
