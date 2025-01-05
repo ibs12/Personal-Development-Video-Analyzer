@@ -147,103 +147,144 @@ const PersonalDevInsightsApp = () => {
     summary: ''
   };
 
-  // Use provided insights or default data
   const data = insights || defaultData;
 
   // State to track section order
   const [sectionOrder, setSectionOrder] = useState(['action', 'insights', 'examples', 'summary']);
 
-  // Function to move section to top
   const moveToTop = (sectionId) => {
     setSectionOrder(prev => {
-      const newOrder = prev.filter(id => id !== sectionId);
-      return [sectionId, ...newOrder];
+        const newOrder = prev.filter(id => id !== sectionId);
+        return [sectionId, ...newOrder];
     });
-  };
+
+    const section = document.getElementById("output");
+
+    section.scrollTo({
+        top: 0,
+        behavior: 'smooth', 
+    });
+};
 
   // Component for each section
   const sections = {
     action: (
-      <section className="bg-gradient-to-r from-[#87CEEB] to-[#B0C4DE] p-5 rounded-lg">
-        <h2 className="flex items-center text-xl font-semibold text-blue-700 mb-4">
-          <BookmarkIcon className="mr-2" /> Action Steps
-        </h2>
-        {(data.actionSteps || []).map((step, index) => (
-          <div key={index} className="mb-4 p-4 bg-white rounded-lg shadow-sm flex justify-between items-center">
-            <div>
-              <h3 className="font-bold text-blue-600 mb-2">{step.action}</h3>
-              {step.explanation && <p className="text-gray-600">{step.explanation}</p>}
+      data.actionSteps && data.actionSteps.length > 0 ? (
+        <section className="bg-gradient-to-r from-[#87CEEB] to-[#B0C4DE] p-5 rounded-lg">
+          <h2 className="flex items-center text-xl font-semibold text-blue-700 mb-4">
+            <BookmarkIcon className="mr-2" /> Action Steps
+          </h2>
+          {data.actionSteps.map((step, index) => (
+            <div key={index} className="mb-4 p-4 bg-white rounded-lg shadow-sm flex justify-between items-center">
+              <div>
+                <h3 className="font-bold text-blue-600 mb-2">{step.action}</h3>
+                {step.explanation && <p className="text-gray-600">{step.explanation}</p>}
+              </div>
+              {step.timestamp && (
+                <button
+                  onClick={() => handleTimestampClick(step.timestamp)}
+                  className="bg-white text-blue-500 px-3 py-1 rounded hover:bg-white-600 text-lg font-semibold"
+                >
+                  {new Date(step.timestamp * 1000).toISOString().substr(14, 5)}
+                </button>
+              )}
             </div>
-            {step.timestamp && (
-              <button
-                onClick={() => handleTimestampClick(step.timestamp)}
-                className="bg-white text-blue-500 px-3 py-1 rounded hover:bg-white-600 text-lg font-semibold"
-              >
-                {new Date(step.timestamp * 1000).toISOString().substr(14, 5)}
-              </button>
-            )}
-          </div>
-        ))}
-      </section>
+          ))}
+        </section>
+      ) : (
+        <section className="bg-gradient-to-r from-[#87CEEB] to-[#B0C4DE] p-5 rounded-lg">
+          <h2 className="flex items-center text-xl font-semibold text-blue-700 mb-4">
+            <BookmarkIcon className="mr-2" /> Action Steps
+          </h2>
+          <p className="text-gray-700">No action steps found for this video.</p>
+        </section>
+      )
     ),
-    
+  
     insights: (
-      <section className="bg-gradient-to-r from-[#dc8efe] to-[#faf5ff] p-5 rounded-lg">
-        <h2 className="flex items-center text-xl font-semibold text-purple-700 mb-4">
-          <LightbulbIcon className="mr-2" /> Key Insights
-        </h2>
-        <ul className="list-disc ml-5 text-gray-700">
-          {(data.keyInsights || []).map((insight, index) => (
-            <div key={index} className="mb-4 p-4 bg-white rounded-lg shadow-sm flex justify-between items-center">
-              <div>
-                <h3 className="font-bold text-purple-700 mb-2 mr-5">{insight.keyInsight}</h3>
+      data.keyInsights && data.keyInsights.length > 0 ? (
+        <section className="bg-gradient-to-r from-[#dc8efe] to-[#faf5ff] p-5 rounded-lg">
+          <h2 className="flex items-center text-xl font-semibold text-purple-700 mb-4">
+            <LightbulbIcon className="mr-2" /> Key Insights
+          </h2>
+          <ul className="list-disc ml-5 text-gray-700">
+            {data.keyInsights.map((insight, index) => (
+              <div key={index} className="mb-4 p-4 bg-white rounded-lg shadow-sm flex justify-between items-center">
+                <div>
+                  <h3 className="font-bold text-purple-700 mb-2 mr-5">{insight.keyInsight}</h3>
+                </div>
+                {insight.timestamp && (
+                  <button
+                    onClick={() => handleTimestampClick(insight.timestamp)}
+                    className="bg-white text-blue-500 px-3 py-1 rounded hover:bg-white-600 text-lg font-semibold"
+                  >
+                    {new Date(insight.timestamp * 1000).toISOString().substr(14, 5)}
+                  </button>
+                )}
               </div>
-              {insight.timestamp && (
-                <button
-                  onClick={() => handleTimestampClick(insight.timestamp)}
-                  className="bg-white text-blue-500 px-3 py-1 rounded hover:bg-white-600 text-lg font-semibold"
-                >
-                  {new Date(insight.timestamp * 1000).toISOString().substr(14, 5)}
-                </button>
-              )}
-            </div>
-          ))}
-        </ul>
-      </section>
+            ))}
+          </ul>
+        </section>
+      ) : (
+        <section className="bg-gradient-to-r from-[#dc8efe] to-[#faf5ff] p-5 rounded-lg">
+          <h2 className="flex items-center text-xl font-semibold text-purple-700 mb-4">
+            <LightbulbIcon className="mr-2" /> Key Insights
+          </h2>
+          <p className="text-gray-700">No insights found for this video.</p>
+        </section>
+      )
     ),
-    
+  
     examples: (
-      <section className="bg-gradient-to-r from-[#97e8af] to-[#f0fdf4] p-5 rounded-lg">
-        <h2 className="flex items-center text-xl font-semibold text-green-700 mb-4">
-          <Quote className="mr-2" /> Important Examples
-        </h2>
-        <ul className="list-disc ml-5 text-gray-700">
-          {(data.importantExamples || []).map((example, index) => (
-            <div key={index} className="mb-4 p-4 bg-white rounded-lg shadow-sm flex justify-between items-center">
-              <div>
-                <h3 className="font-bold text-green-700 mb-2">{example.example}</h3>
+      data.importantExamples && data.importantExamples.length > 0 ? (
+        <section className="bg-gradient-to-r from-[#97e8af] to-[#f0fdf4] p-5 rounded-lg">
+          <h2 className="flex items-center text-xl font-semibold text-green-700 mb-4">
+            <Quote className="mr-2" /> Important Examples
+          </h2>
+          <ul className="list-disc ml-5 text-gray-700">
+            {data.importantExamples.map((example, index) => (
+              <div key={index} className="mb-4 p-4 bg-white rounded-lg shadow-sm flex justify-between items-center">
+                <div>
+                  <h3 className="font-bold text-green-700 mb-2">{example.example}</h3>
+                </div>
+                {example.timestamp && (
+                  <button
+                    onClick={() => handleTimestampClick(example.timestamp)}
+                    className="bg-white text-blue-500 px-3 py-1 rounded hover:bg-white-600 text-lg font-semibold"
+                  >
+                    {new Date(example.timestamp * 1000).toISOString().substr(14, 5)}
+                  </button>
+                )}
               </div>
-              {example.timestamp && (
-                <button
-                  onClick={() => handleTimestampClick(example.timestamp)}
-                  className="bg-white text-blue-500 px-3 py-1 rounded hover:bg-white-600 text-lg font-semibold"
-                >
-                  {new Date(example.timestamp * 1000).toISOString().substr(14, 5)}
-                </button>
-              )}
-            </div>
-          ))}
-        </ul>
-      </section>
+            ))}
+          </ul>
+        </section>
+      ) : (
+        <section className="bg-gradient-to-r from-[#97e8af] to-[#f0fdf4] p-5 rounded-lg">
+          <h2 className="flex items-center text-xl font-semibold text-green-700 mb-4">
+            <Quote className="mr-2" /> Important Examples
+          </h2>
+          <p className="text-gray-700">No examples found for this video.</p>
+        </section>
+      )
     ),
-    
+  
     summary: (
-      <section className="bg-gray-50 p-5 rounded-lg">
-        <h2 className="flex items-center text-xl font-semibold text-gray-700 mb-4">
-          <FileTextIcon className="mr-2" /> Summary
-        </h2>
-        <p className="text-gray-600">{data.summary || ''}</p>
-      </section>
+      data.summary ? (
+        <section className="bg-gray-50 p-5 rounded-lg">
+          <h2 className="flex items-center text-xl font-semibold text-gray-700 mb-4">
+            <MenuIcon className="mr-2" /> Summary
+          </h2>
+          <p className="text-gray-600">{data.summary}</p>
+        </section>
+      ) : (
+        <section className="bg-gray-50 p-5 rounded-lg">
+          <h2 className="flex items-center text-xl font-semibold text-gray-700 mb-4">
+            <MenuIcon className="mr-2" /> Summary
+          </h2>
+          <p className="text-gray-700">No summary available for this video.</p>
+        </section>
+      )
     )
   };
 
@@ -259,7 +300,7 @@ const PersonalDevInsightsApp = () => {
 
       <section className="mb-6">
         <div className="flex items-center w-full h-16">
-          <div className="flex-grow flex justify-center space-x-4">
+          <div className="flex-grow flex justify-center space-x-4 pl-[18vw]"> 
             <form 
               onSubmit={handleVideoSubmission} 
               className="relative w-[450px] mx-auto" 
@@ -308,7 +349,7 @@ const PersonalDevInsightsApp = () => {
             {/* Important Examples */}
             <div className="group relative cursor-pointer" onClick={() => moveToTop('examples')}>
               <div className="flex items-center h-12 bg-gradient-to-r from-green-400 to-green-500 rounded-full transition-all duration-300 w-12 group-hover:w-[160px] pl-3 overflow-hidden">
-                <StarIcon className="w-6 h-6 text-white shrink-0 mr-2" style={{ height: '100%', display: 'flex', alignItems: 'center'}} />
+                <Quote className="w-6 h-6 text-white shrink-0 mr-2" style={{ height: '100%', display: 'flex', alignItems: 'center'}} />
                 <span className="opacity-0 text-white whitespace-nowrap transition-opacity duration-300 group-hover:opacity-100">
                   Examples
                 </span>
@@ -381,7 +422,7 @@ const PersonalDevInsightsApp = () => {
           </div>
 
           {/* Sections */}
-          <div className="md:col-span-1 space-y-6 h-[90vh] overflow-y-scroll">
+          <div id = "output" className="md:col-span-1 space-y-6 h-[90vh] overflow-y-scroll">
             {sectionOrder.map(sectionId => sections[sectionId])}
           </div>
         </div>
