@@ -6,6 +6,7 @@ import os
 import json
 
 app = Flask(__name__)
+app.run(debug=False)
 
 # Configure CORS
 CORS(
