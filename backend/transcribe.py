@@ -6,7 +6,7 @@ import logging
 # import whisper
 # from pydub import AudioSegment
 import os
-from transformers import BartForConditionalGeneration, BartTokenizer
+# from transformers import BartForConditionalGeneration, BartTokenizer
 from youtube_transcript_api import YouTubeTranscriptApi
 import json
 
@@ -14,6 +14,44 @@ import json
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(message)s')
 logger = logging.getLogger()
+
+from youtube_transcript_api import YouTubeTranscriptApi
+import json
+
+def get_transcript(video_id):
+    try:
+        ytt_api = YouTubeTranscriptApi()
+        fetched = ytt_api.fetch(video_id)          # FetchedTranscript
+        raw = fetched.to_raw_data()                # list[dict] with text/start/duration :contentReference[oaicite:2]{index=2}
+
+        combined_text = " ".join(p["text"] for p in raw)
+        with open("transcript.txt", "w", encoding="utf-8") as f:
+            f.write(combined_text)
+
+        return json.dumps(raw, ensure_ascii=False)
+    except Exception as e:
+        # IMPORTANT if you parse stdout in Flask: don't print extra text to stdout
+        return json.dumps({"error": str(e)}, ensure_ascii=False)
+
+
+
+if __name__ == "__main__":
+    if len(sys.argv) != 2:
+        print(json.dumps({"error": "Usage: python transcribe.py <YouTubeVideoID>"}), flush=True)
+        sys.exit(1)
+
+    video_id = sys.argv[1]
+    out = get_transcript(video_id)
+
+    if out is None:
+        # keep stdout JSON so Flask can parse it
+        print(json.dumps({"error": "Failed to fetch transcript"}), flush=True)
+        sys.exit(2)
+
+    # out is already a JSON string in your current get_transcript()
+    print(out, flush=True)
+    sys.exit(0)
+    
 
 # from pytube import YouTube
 # from pytubefix.exceptions import VideoUnavailable
@@ -69,40 +107,6 @@ logger = logging.getLogger()
 #     except Exception as e:
 #         logger.error(f"Error in transcription: {e}")
 #         raise
-
-from youtube_transcript_api import YouTubeTranscriptApi
-
-import json
-
-def get_transcript(video_id):
-    try:
-        # Fetch transcript using YouTubeTranscriptApi
-        transcript = YouTubeTranscriptApi.get_transcript(video_id)
-        
-        # Save combined text to a file
-        combined_text = ' '.join(part['text'] for part in transcript)
-        with open("transcript.txt", "w") as file:
-            file.write(combined_text)
-
-        # Return structured transcript as JSON
-        return json.dumps(transcript)  # Ensure valid JSON output
-    except Exception as e:
-        print(f"An error occurred: {e}")
-        return None
-
-if __name__ == "__main__":
-    import sys
-
-    if len(sys.argv) != 2:
-        print(json.dumps({"error": "Usage: python transcribe.py <YouTubeVideoID>"}))
-        sys.exit(1)
-
-    youtube_id = sys.argv[1]
-    transcript = get_transcript(youtube_id)
-    if transcript:
-        print(transcript)
-    else:
-        print(json.dumps({"error": "Failed to fetch transcript."}))
 
     
 # import re

@@ -6,7 +6,7 @@ import os
 import json
 
 app = Flask(__name__)
-app.run(debug=False)
+
 
 # Configure CORS
 CORS(
@@ -14,51 +14,80 @@ CORS(
     resources={r"/*": {"origins": "http://localhost:3000"}},
     supports_credentials=True
 )
+from pathlib import Path
+import sys
 
 @app.route('/transcribe', methods=['POST'])
 def fetch_transcript():
-    youtube_id = request.json.get('YouTubeVideoID')
+    data = request.get_json(silent=True) or {}
+    youtube_id = data.get('YouTubeVideoID')
     if not youtube_id:
         return jsonify({"message": "YouTubeVideoID is required."}), 400
 
-    print(f"Received YouTube URL: {youtube_id}")  # Debug log
-    
+    print(f"Received YouTube ID: {youtube_id}")
+
     try:
-        # Run the transcription script
-        result = subprocess.run(['python', 'transcribe.py', youtube_id], capture_output=True, text=True)
+        # Always use the same interpreter running Flask (venv-safe)
+        script_path = Path(__file__).with_name("transcribe.py")
 
-        if result.returncode == 0:
-            # Log the raw output for debugging purposes
-            print(f"Raw stdout: {result.stdout}")
-            
-            # Clean the stdout output: strip any unwanted characters or extra spaces
-            cleaned_stdout = result.stdout.strip()
-            
-            # Attempt to parse the cleaned output as JSON
-            try:
-                structured_transcript = json.loads(cleaned_stdout)
-                
-                # Optionally filter out unwanted elements like non-speech text
-                structured_transcript = [item for item in structured_transcript if item['text'] != '[Music]']
-                
-                print(f"Structured Transcript: {structured_transcript}")  # Debug log
-                
-            except json.JSONDecodeError as e:
-                return jsonify({"message": f"Error decoding JSON: {str(e)}", "stdout": cleaned_stdout}), 500
-            
-            # Read combined text from the file
-            with open("transcript.txt", "r") as file:
-                combined_text = file.read().strip()
+        result = subprocess.run(
+            [sys.executable, str(script_path), youtube_id],
+            capture_output=True,
+            text=True
+        )
 
+        stdout = (result.stdout or "").strip()
+        stderr = (result.stderr or "").strip()
+
+        # 🔥 THIS is where it fits: immediately after subprocess.run
+        if result.returncode != 0 or not stdout:
             return jsonify({
-                "message": "Transcription completed successfully.",
-                "combined_text": combined_text,
-                "structured_transcript": structured_transcript
-            }), 200
-        else:
-            return jsonify({"message": "Transcription failed."}), 500
+                "message": "transcribe.py did not return JSON on stdout",
+                "returncode": result.returncode,
+                "stdout": stdout,
+                "stderr": stderr
+            }), 500
+
+        # Parse stdout JSON
+        try:
+            structured_transcript = json.loads(stdout)
+        except json.JSONDecodeError as e:
+            return jsonify({
+                "message": f"Error decoding JSON: {str(e)}",
+                "stdout": stdout,
+                "stderr": stderr
+            }), 500
+
+        # If script returned {"error": "..."} instead of a list
+        if isinstance(structured_transcript, dict) and "error" in structured_transcript:
+            return jsonify({
+                "message": "Transcript fetch failed",
+                "details": structured_transcript["error"],
+                "stderr": stderr
+            }), 500
+
+        # Filter out [Music] safely
+        structured_transcript = [
+            item for item in structured_transcript
+            if isinstance(item, dict) and item.get("text") != "[Music]"
+        ]
+
+        # Read combined text written by transcribe.py
+        try:
+            with open("transcript.txt", "r", encoding="utf-8") as file:
+                combined_text = file.read().strip()
+        except FileNotFoundError:
+            combined_text = ""
+
+        return jsonify({
+            "message": "Transcription completed successfully.",
+            "combined_text": combined_text,
+            "structured_transcript": structured_transcript
+        }), 200
+
     except Exception as e:
         return jsonify({"message": str(e)}), 500
+
 
 
 
@@ -93,4 +122,4 @@ def process_transcript():
 
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=False, host="127.0.0.1", port=5000)

@@ -60,7 +60,7 @@ class ProcessedContent:
 class PersonalDevelopmentProcessor:
     def __init__(self, api_key: str):
         genai.configure(api_key=api_key)
-        self.model = genai.GenerativeModel('gemini-pro')
+        self.model = genai.GenerativeModel('gemini-3-flash-preview')
     
     def _format_transcript(self, transcript: List[Dict[str, Any]]) -> str:
         """Formats the transcript list into a readable text format."""
