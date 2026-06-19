@@ -2,14 +2,17 @@ import React, { useState } from 'react';
 import axios from 'axios';
 import './search.css';
 import {
+  Search,
+  Loader2,
+  BrainCircuit,
   BookmarkIcon,
   LightbulbIcon,
-  FileTextIcon,
   Quote,
-  Search,
-  MenuIcon,
-  Loader2,
-  BrainCircuit
+  AlignLeft,
+  FileTextIcon,
+  Clock,
+  X,
+  Sparkles,
 } from 'lucide-react';
 
 // Base URL of the Flask backend. Override per-environment with
@@ -27,6 +30,22 @@ const EFFORTS = [
   { value: 'high', label: 'High · most thorough' },
 ];
 
+const TABS = [
+  { id: 'action', label: 'Action Steps', icon: BookmarkIcon },
+  { id: 'insights', label: 'Key Insights', icon: LightbulbIcon },
+  { id: 'examples', label: 'Examples', icon: Quote },
+  { id: 'summary', label: 'Summary', icon: AlignLeft },
+];
+
+const formatTime = (t) => {
+  const total = Math.floor(parseFloat(t) || 0);
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  const mm = String(m).padStart(2, '0');
+  const ss = String(s).padStart(2, '0');
+  return h > 0 ? `${h}:${mm}:${ss}` : `${m}:${ss}`;
+};
 
 const PersonalDevInsightsApp = () => {
   const [videoUrl, setVideoUrl] = useState('');
@@ -37,20 +56,19 @@ const PersonalDevInsightsApp = () => {
   const [insights, setInsights] = useState(null);
   const [model, setModel] = useState(MODELS[0].value);
   const [effort, setEffort] = useState('medium');
-  const [reasoning, setReasoning] = useState('');   // live thinking text
-  const [stage, setStage] = useState('');           // current pipeline stage label
+  const [reasoning, setReasoning] = useState(''); // live thinking text
+  const [stage, setStage] = useState(''); // current pipeline stage label
+  const [activeTab, setActiveTab] = useState('action');
 
-
-  // Extract YouTube Video ID
   const extractVideoId = (url) => {
     const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
     const match = url.match(regExp);
-    return (match && match[2].length === 11) ? match[2] : null;
+    return match && match[2].length === 11 ? match[2] : null;
   };
 
-  // Handle Video Submission
   const handleVideoSubmission = async (event) => {
-    event.preventDefault();
+    if (event) event.preventDefault();
+    if (isLoading) return;
     setError('');
     setInsights(null);
     setReasoning('');
@@ -60,33 +78,25 @@ const PersonalDevInsightsApp = () => {
       setIsLoading(true);
       const extractedVideoId = extractVideoId(videoUrl);
       if (!extractedVideoId) {
-        throw new Error('Invalid YouTube URL');
+        throw new Error('That doesn’t look like a valid YouTube URL.');
       }
       setVideoId(extractedVideoId);
 
       setStage('Fetching transcript…');
-      const transcribeResponse = await axios.post(
-        `${API_BASE_URL}/transcribe`,
-        { YouTubeVideoID: extractedVideoId }
-      );
-      
+      const transcribeResponse = await axios.post(`${API_BASE_URL}/transcribe`, {
+        YouTubeVideoID: extractedVideoId,
+      });
       if (transcribeResponse.status !== 200) {
         throw new Error('Failed to fetch transcript.');
       }
-      
-      console.log("Response data:", transcribeResponse.data);
-      
-      // Assuming the structured_transcript is within the response data
-      const transcriptData = transcribeResponse.data.structured_transcript.map(item => ({
+
+      const transcriptData = transcribeResponse.data.structured_transcript.map((item) => ({
         text: item.text,
         start: item.start,
-        duration: item.duration
+        duration: item.duration,
       }));
-
       setTranscript(transcriptData);
-      
-      console.log("Mapped Transcript Data:", transcriptData);
-      
+
       // Stream the analysis (Server-Sent Events) so we can show Claude's
       // reasoning live instead of staring at empty space.
       const processResponse = await fetch(`${API_BASE_URL}/process-transcript`, {
@@ -94,7 +104,6 @@ const PersonalDevInsightsApp = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ transcript: transcriptData, model, effort }),
       });
-
       if (!processResponse.ok || !processResponse.body) {
         throw new Error('Failed to process transcript.');
       }
@@ -123,7 +132,7 @@ const PersonalDevInsightsApp = () => {
           } else if (ev.type === 'result') {
             gotResult = true;
             const d = ev.data;
-            setInsights({
+            const next = {
               actionSteps: (d.action_steps || []).map((step) => ({
                 action: step.action,
                 explanation: step.explanation,
@@ -132,7 +141,14 @@ const PersonalDevInsightsApp = () => {
               keyInsights: d.key_insights || [],
               importantExamples: d.examples || [],
               summary: d.summary || '',
-            });
+            };
+            setInsights(next);
+            setActiveTab(
+              next.actionSteps.length ? 'action'
+              : next.keyInsights.length ? 'insights'
+              : next.importantExamples.length ? 'examples'
+              : 'summary'
+            );
           } else if (ev.type === 'error') {
             throw new Error(ev.message || 'Failed to process transcript.');
           }
@@ -142,478 +158,293 @@ const PersonalDevInsightsApp = () => {
       if (!gotResult) {
         throw new Error('The model did not return any analysis.');
       }
-    } catch (error) {
-      console.error('Error details:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status,
-      });
-      setError(error.message || 'An error occurred while processing your request.');
+    } catch (err) {
+      setError(err.message || 'An error occurred while processing your request.');
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleTimestampClick = (timestamp) => {
-    // Convert timestamp to integer seconds
     const startTime = Math.floor(parseFloat(timestamp));
-  
-    // Get the current iframe
     const iframe = document.querySelector('iframe');
-    
     if (iframe) {
-      // Modify the src to include the start time and autoplay
       iframe.src = `https://www.youtube.com/embed/${videoId}?start=${startTime}&autoplay=1`;
     }
   };
 
-  const defaultData = {
-    actionSteps: [],
-    keyInsights: [],
-    importantExamples: [],
-    summary: ''
+  const data = insights || { actionSteps: [], keyInsights: [], importantExamples: [], summary: '' };
+  const counts = {
+    action: data.actionSteps.length,
+    insights: data.keyInsights.length,
+    examples: data.importantExamples.length,
+    summary: data.summary ? 1 : 0,
   };
 
-  const data = insights || defaultData;
+  const TimestampChip = ({ timestamp }) =>
+    timestamp ? (
+      <button
+        onClick={() => handleTimestampClick(timestamp)}
+        className="shrink-0 inline-flex items-center gap-1 rounded-full bg-indigo-50 text-indigo-700 px-2.5 py-1 text-xs font-semibold hover:bg-indigo-100 transition-colors"
+        title="Jump to this moment"
+      >
+        <Clock className="w-3 h-3" />
+        {formatTime(timestamp)}
+      </button>
+    ) : null;
 
-  // State to track section order
-  const [sectionOrder, setSectionOrder] = useState(['action', 'insights', 'examples', 'summary']);
+  const Empty = ({ children }) => (
+    <div className="text-center text-slate-400 text-sm py-12">{children}</div>
+  );
 
-  const moveToTop = (sectionId) => {
-    setSectionOrder(prev => {
-        const newOrder = prev.filter(id => id !== sectionId);
-        return [sectionId, ...newOrder];
-    });
-
-    const section = document.getElementById("output");
-
-    section.scrollTo({
-        top: 0,
-        behavior: 'smooth', 
-    });
-};
-
-  // Component for each section
-  const sections = {
-    action: (
-      data.actionSteps && data.actionSteps.length > 0 ? (
-        <section className="bg-gradient-to-r from-[#87CEEB] to-[#B0C4DE] p-5 rounded-lg">
-          <h2 className="flex items-center text-xl font-semibold text-blue-700 mb-4">
-            <BookmarkIcon className="mr-2" /> Action Steps
-          </h2>
-          {data.actionSteps.map((step, index) => (
-            <div key={index} className="mb-4 p-4 bg-white rounded-lg shadow-sm flex justify-between items-center">
-              <div>
-                <h3 className="font-bold text-blue-600 mb-2">{step.action}</h3>
-                {step.explanation && <p className="text-gray-600">{step.explanation}</p>}
+  const renderTab = () => {
+    if (activeTab === 'action') {
+      return data.actionSteps.length ? (
+        <div className="space-y-3">
+          {data.actionSteps.map((step, i) => (
+            <div key={i} className="rounded-xl border border-slate-200 bg-white p-4 hover:shadow-sm transition-shadow">
+              <div className="flex items-start justify-between gap-3">
+                <h3 className="font-semibold text-slate-800">{step.action}</h3>
+                <TimestampChip timestamp={step.timestamp} />
               </div>
-              {step.timestamp && (
-                <button
-                  onClick={() => handleTimestampClick(step.timestamp)}
-                  className="bg-white text-blue-500 px-3 py-1 rounded hover:bg-white-600 text-lg font-semibold"
-                >
-                  {new Date(step.timestamp * 1000).toISOString().substr(14, 5)}
-                </button>
-              )}
+              {step.explanation && <p className="mt-1.5 text-sm text-slate-600 leading-relaxed">{step.explanation}</p>}
             </div>
           ))}
-        </section>
+        </div>
       ) : (
-        <section className="bg-gradient-to-r from-[#87CEEB] to-[#B0C4DE] p-5 rounded-lg">
-          <h2 className="flex items-center text-xl font-semibold text-blue-700 mb-4">
-            <BookmarkIcon className="mr-2" /> Action Steps
-          </h2>
-          <p className="text-gray-700">No action steps found for this video.</p>
-        </section>
-      )
-    ),
-  
-    insights: (
-      data.keyInsights && data.keyInsights.length > 0 ? (
-        <section className="bg-gradient-to-r from-[#dc8efe] to-[#faf5ff] p-5 rounded-lg">
-          <h2 className="flex items-center text-xl font-semibold text-purple-700 mb-4">
-            <LightbulbIcon className="mr-2" /> Key Insights
-          </h2>
-          <ul className="list-disc ml-5 text-gray-700">
-            {data.keyInsights.map((insight, index) => (
-              <div key={index} className="mb-4 p-4 bg-white rounded-lg shadow-sm flex justify-between items-center">
-                <div>
-                  <h3 className="font-bold text-purple-700 mb-2 mr-5">{insight.keyInsight}</h3>
-                </div>
-                {insight.timestamp && (
-                  <button
-                    onClick={() => handleTimestampClick(insight.timestamp)}
-                    className="bg-white text-blue-500 px-3 py-1 rounded hover:bg-white-600 text-lg font-semibold"
-                  >
-                    {new Date(insight.timestamp * 1000).toISOString().substr(14, 5)}
-                  </button>
-                )}
-              </div>
-            ))}
-          </ul>
-        </section>
+        <Empty>No action steps found for this video.</Empty>
+      );
+    }
+    if (activeTab === 'insights') {
+      return data.keyInsights.length ? (
+        <div className="space-y-3">
+          {data.keyInsights.map((it, i) => (
+            <div key={i} className="rounded-xl border border-slate-200 bg-white p-4 hover:shadow-sm transition-shadow flex items-start justify-between gap-3">
+              <p className="text-slate-800 leading-relaxed">{it.keyInsight}</p>
+              <TimestampChip timestamp={it.timestamp} />
+            </div>
+          ))}
+        </div>
       ) : (
-        <section className="bg-gradient-to-r from-[#dc8efe] to-[#faf5ff] p-5 rounded-lg">
-          <h2 className="flex items-center text-xl font-semibold text-purple-700 mb-4">
-            <LightbulbIcon className="mr-2" /> Key Insights
-          </h2>
-          <p className="text-gray-700">No insights found for this video.</p>
-        </section>
-      )
-    ),
-  
-    examples: (
-      data.importantExamples && data.importantExamples.length > 0 ? (
-        <section className="bg-gradient-to-r from-[#97e8af] to-[#f0fdf4] p-5 rounded-lg">
-          <h2 className="flex items-center text-xl font-semibold text-green-700 mb-4">
-            <Quote className="mr-2" /> Important Examples
-          </h2>
-          <ul className="list-disc ml-5 text-gray-700">
-            {data.importantExamples.map((example, index) => (
-              <div key={index} className="mb-4 p-4 bg-white rounded-lg shadow-sm flex justify-between items-center">
-                <div>
-                  <h3 className="font-bold text-green-700 mb-2">{example.example}</h3>
-                </div>
-                {example.timestamp && (
-                  <button
-                    onClick={() => handleTimestampClick(example.timestamp)}
-                    className="bg-white text-blue-500 px-3 py-1 rounded hover:bg-white-600 text-lg font-semibold"
-                  >
-                    {new Date(example.timestamp * 1000).toISOString().substr(14, 5)}
-                  </button>
-                )}
-              </div>
-            ))}
-          </ul>
-        </section>
+        <Empty>No key insights found for this video.</Empty>
+      );
+    }
+    if (activeTab === 'examples') {
+      return data.importantExamples.length ? (
+        <div className="space-y-3">
+          {data.importantExamples.map((it, i) => (
+            <div key={i} className="rounded-xl border border-slate-200 bg-white p-4 hover:shadow-sm transition-shadow flex items-start justify-between gap-3">
+              <p className="text-slate-800 leading-relaxed">{it.example}</p>
+              <TimestampChip timestamp={it.timestamp} />
+            </div>
+          ))}
+        </div>
       ) : (
-        <section className="bg-gradient-to-r from-[#97e8af] to-[#f0fdf4] p-5 rounded-lg">
-          <h2 className="flex items-center text-xl font-semibold text-green-700 mb-4">
-            <Quote className="mr-2" /> Important Examples
-          </h2>
-          <p className="text-gray-700">No examples found for this video.</p>
-        </section>
-      )
-    ),
-  
-    summary: (
-      data.summary ? (
-        <section className="bg-gray-50 p-5 rounded-lg">
-          <h2 className="flex items-center text-xl font-semibold text-gray-700 mb-4">
-            <MenuIcon className="mr-2" /> Summary
-          </h2>
-          <p className="text-gray-600">{data.summary}</p>
-        </section>
-      ) : (
-        <section className="bg-gray-50 p-5 rounded-lg">
-          <h2 className="flex items-center text-xl font-semibold text-gray-700 mb-4">
-            <MenuIcon className="mr-2" /> Summary
-          </h2>
-          <p className="text-gray-700">No summary available for this video.</p>
-        </section>
-      )
-    )
+        <Empty>No examples found for this video.</Empty>
+      );
+    }
+    return data.summary ? (
+      <div className="rounded-xl border border-slate-200 bg-white p-5">
+        <p className="text-slate-700 leading-relaxed whitespace-pre-wrap">{data.summary}</p>
+      </div>
+    ) : (
+      <Empty>No summary available for this video.</Empty>
+    );
   };
 
-  
-  // max-w-6xl mx-auto p-6 bg-white shadow-lg rounded-xl
   return (
-    <div className="h-screen p-5 bg-inherit overflow-y-scroll">
-      <header className="mb-6 text-center">
-        <h1 className="text-3xl font-bold text-neutral-800 mb-4">
-          Personal Development Insights Extractor
-        </h1>
-      </header>
-
-      <section className="mb-6">
-        <div className="flex items-center w-full h-16">
-          <div className="flex-grow flex justify-center space-x-4 pl-[18vw]"> 
-            <form 
-              onSubmit={handleVideoSubmission} 
-              className="relative w-[450px] mx-auto" 
-            >
-              <div className="flex items-center bg-white rounded-full pr-4"> 
-                <div className="absolute left-5 top-1/2 transform -translate-y-1/2">
-                  <Search 
-                    className="text-neutral-800 cursor-pointer" 
-                    onClick={handleVideoSubmission}
-                    size={32} 
-                  />
-                </div>
-                <input 
-                  type="text" 
-                  value={videoUrl}
-                  onChange={(e) => setVideoUrl(e.target.value)}
-                  placeholder="Paste YouTube video URL"
-                  className="w-full pl-16 pr-6 py-5 text-3xl bg-transparent text-neutral-800 placeholder-neutral-400 focus:outline-none" 
-                  // Increased padding, text size, and left padding for icon
-                />
-              </div>
-            </form>
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 text-slate-800">
+      <div className="max-w-6xl mx-auto px-4 py-8 sm:py-10">
+        {/* Header */}
+        <header className="text-center mb-8">
+          <div className="inline-flex items-center gap-2 text-indigo-600 mb-2">
+            <Sparkles className="w-5 h-5" />
+            <span className="text-sm font-semibold tracking-wide uppercase">YouTube Key Takeaways</span>
           </div>
-          {/* Navigation Buttons */}
-          <div className="flex items-center bg-white shadow-md py-4 px-6 space-x-4 text-gray-700 rounded-lg">
-            {/* Action Steps */}
-            <div className="group relative cursor-pointer" onClick={() => moveToTop('action')}>
-              <div className="flex items-center h-12 bg-gradient-to-r from-blue-400 to-blue-500 rounded-full transition-all duration-300 w-12 group-hover:w-[160px] pl-3 overflow-hidden">
-                <BookmarkIcon className="w-6 h-6 text-white shrink-0 mr-2" style={{ height: '100%', display: 'flex', alignItems: 'center'}} />
-                <span className="opacity-0 text-white whitespace-nowrap transition-opacity duration-300 group-hover:opacity-100">
-                  Action Steps
-                </span>
-              </div>
-            </div>
+          <h1 className="text-3xl sm:text-4xl font-bold text-slate-900">
+            Turn any video into action steps & insights
+          </h1>
+          <p className="mt-2 text-slate-500">
+            Paste a YouTube link and let Claude distill it — every takeaway linked to the moment it happens.
+          </p>
+        </header>
 
-            {/* Key Insights */}
-            <div className="group relative cursor-pointer" onClick={() => moveToTop('insights')}>
-              <div className="flex items-center h-12 bg-gradient-to-r from-purple-400 to-purple-500 rounded-full transition-all duration-300 w-12 group-hover:w-[160px] pl-3 overflow-hidden">
-                <LightbulbIcon className="w-6 h-6 text-white shrink-0 mr-2" style={{ height: '100%', display: 'flex', alignItems: 'center'}} />
-                <span className="opacity-0 text-white whitespace-nowrap transition-opacity duration-300 group-hover:opacity-100">
-                  Key Insights
-                </span>
-              </div>
+        {/* Search card */}
+        <div className="max-w-2xl mx-auto bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-5">
+          <form onSubmit={handleVideoSubmission}>
+            <div className="flex items-center gap-2 rounded-xl border border-slate-300 bg-slate-50 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-100 transition-all px-3">
+              <Search className="w-5 h-5 text-slate-400 shrink-0" />
+              <input
+                type="text"
+                value={videoUrl}
+                onChange={(e) => setVideoUrl(e.target.value)}
+                placeholder="Paste a YouTube video URL…"
+                className="flex-1 bg-transparent py-3 text-slate-800 placeholder-slate-400 focus:outline-none"
+              />
+              {videoUrl && (
+                <button type="button" onClick={() => setVideoUrl('')} className="text-slate-400 hover:text-slate-600 shrink-0" aria-label="Clear">
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="shrink-0 inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+              >
+                {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                {isLoading ? 'Working…' : 'Analyze'}
+              </button>
             </div>
+          </form>
 
-            {/* Important Examples */}
-            <div className="group relative cursor-pointer" onClick={() => moveToTop('examples')}>
-              <div className="flex items-center h-12 bg-gradient-to-r from-green-400 to-green-500 rounded-full transition-all duration-300 w-12 group-hover:w-[160px] pl-3 overflow-hidden">
-                <Quote className="w-6 h-6 text-white shrink-0 mr-2" style={{ height: '100%', display: 'flex', alignItems: 'center'}} />
-                <span className="opacity-0 text-white whitespace-nowrap transition-opacity duration-300 group-hover:opacity-100">
-                  Examples
-                </span>
-              </div>
-            </div>
-
-            {/* Summary */}
-            <div className="group relative cursor-pointer" onClick={() => moveToTop('summary')}>
-              <div className="flex items-center h-12 bg-gradient-to-r from-gray-400 to-gray-500 rounded-full transition-all duration-300 w-12 group-hover:w-[160px] pl-3 overflow-hidden">
-                <MenuIcon className="w-6 h-6 text-white shrink-0 mr-2" style={{ height: '100%', display: 'flex', alignItems: 'center'}} />
-                <span className="opacity-0 text-white whitespace-nowrap transition-opacity duration-300 group-hover:opacity-100">
-                  Summary
-                </span>
-              </div>
-            </div>
+          {/* Controls */}
+          <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-slate-600">
+            <label className="flex items-center gap-2">
+              <span className="font-medium text-slate-500">Model</span>
+              <select
+                value={model}
+                onChange={(e) => setModel(e.target.value)}
+                disabled={isLoading}
+                className="bg-white rounded-md border border-slate-200 px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-100 disabled:opacity-60"
+              >
+                {MODELS.map((m) => (
+                  <option key={m.value} value={m.value}>{m.label}</option>
+                ))}
+              </select>
+            </label>
+            <label className="flex items-center gap-2">
+              <span className="font-medium text-slate-500">Thinking</span>
+              <select
+                value={effort}
+                onChange={(e) => setEffort(e.target.value)}
+                disabled={isLoading}
+                className="bg-white rounded-md border border-slate-200 px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-100 disabled:opacity-60"
+              >
+                {EFFORTS.map((x) => (
+                  <option key={x.value} value={x.value}>{x.label}</option>
+                ))}
+              </select>
+            </label>
           </div>
-      </div>
-
-        {/* Model + thinking-level controls */}
-        <div className="flex items-center justify-center gap-4 mt-4 text-sm text-neutral-700">
-          <label className="flex items-center gap-2">
-            <span className="font-medium">Model</span>
-            <select
-              value={model}
-              onChange={(e) => setModel(e.target.value)}
-              disabled={isLoading}
-              className="bg-white rounded-md px-3 py-1.5 shadow-sm focus:outline-none disabled:opacity-60"
-            >
-              {MODELS.map((m) => (
-                <option key={m.value} value={m.value}>{m.label}</option>
-              ))}
-            </select>
-          </label>
-          <label className="flex items-center gap-2">
-            <span className="font-medium">Thinking</span>
-            <select
-              value={effort}
-              onChange={(e) => setEffort(e.target.value)}
-              disabled={isLoading}
-              className="bg-white rounded-md px-3 py-1.5 shadow-sm focus:outline-none disabled:opacity-60"
-            >
-              {EFFORTS.map((x) => (
-                <option key={x.value} value={x.value}>{x.label}</option>
-              ))}
-            </select>
-          </label>
         </div>
 
+        {/* Error */}
         {error && (
-          <div className="text-red-500 mt-2 flex justify-center">
+          <div className="max-w-2xl mx-auto mt-4 rounded-xl border border-red-200 bg-red-50 text-red-700 px-4 py-3 text-sm">
             {error}
           </div>
         )}
-      </section>
 
-      {/* Live reasoning — shows Claude's thinking while it works, instead of blank space */}
-      {isLoading && (
-        <div className="max-w-3xl mx-auto mb-8">
-          <div className="bg-white/90 rounded-xl shadow-md p-5">
-            <div className="flex items-center text-sm font-semibold text-neutral-700 mb-3">
-              <Loader2 className="w-4 h-4 mr-2 animate-spin text-blue-500" />
+        {/* Live reasoning */}
+        {isLoading && (
+          <div className="max-w-2xl mx-auto mt-6 rounded-2xl border border-slate-200 bg-white shadow-sm p-5">
+            <div className="flex items-center text-sm font-semibold text-slate-700 mb-3">
+              <Loader2 className="w-4 h-4 mr-2 animate-spin text-indigo-500" />
               {stage || 'Working…'}
             </div>
             {reasoning ? (
-              <pre className="whitespace-pre-wrap break-words text-xs leading-relaxed text-neutral-600 max-h-72 overflow-y-auto font-mono">
+              <pre className="whitespace-pre-wrap break-words text-xs leading-relaxed text-slate-500 max-h-72 overflow-y-auto font-mono">
                 {reasoning}
               </pre>
             ) : (
-              <p className="text-xs text-neutral-400">Claude is thinking…</p>
+              <p className="text-xs text-slate-400">Claude is thinking…</p>
             )}
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Collapsible reasoning once results are in */}
-      {!isLoading && insights && reasoning && (
-        <details className="max-w-3xl mx-auto mb-6">
-          <summary className="cursor-pointer text-sm font-medium text-neutral-600 flex items-center gap-2">
-            <BrainCircuit className="w-4 h-4" /> View model reasoning
-          </summary>
-          <pre className="whitespace-pre-wrap break-words text-xs leading-relaxed text-neutral-500 mt-2 max-h-72 overflow-y-auto font-mono bg-white/80 rounded-lg p-4">
-            {reasoning}
-          </pre>
-        </details>
-      )}
+        {/* Empty state */}
+        {!isLoading && !insights && !error && (
+          <div className="max-w-2xl mx-auto mt-10 text-center text-slate-400">
+            <BrainCircuit className="w-10 h-10 mx-auto mb-3 text-slate-300" />
+            <p className="text-sm">Your action steps, insights, examples, and summary will appear here.</p>
+          </div>
+        )}
 
-      {videoId && insights && (
-        <div className="child grid grid-cols-1 md:grid-cols-2 gap-6 pb-10">
-          {/* Video Player Column */}
-          <div className="md:col-span-1">
-            <div className="relative pb-[56.25%] h-0 overflow-hidden">
-              <iframe
-                key={videoId}  // Force re-render on new video
-                src={`https://www.youtube.com/embed/${videoId}`}
-                title="YouTube video player"
-                frameBorder="0"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-                className="absolute top-0 left-0 w-full h-full rounded-3xl"
-                onLoad={() => {
-                  console.log('Video iframe loaded');
-                  setIsLoading(false);
-                }}
-              />
-              {isLoading && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/50">
-                  Loading video...
-                </div>
-              )}
-            </div>
-            {/* Transcript Column */}
-              <div className="bg-gray-50 p-4 mt-5 rounded-lg">
-                <h2 className="flex items-center text-xl font-semibold text-gray-700 mb-4">
-                  <FileTextIcon className="mr-2" /> Transcript
-                </h2>
-                <div className="h-96 overflow-y-auto">
-                  {transcript.map((entry, idx) => (
-                    <div
-                      key={idx}
-                      className="text-lg text-gray-600 hover:bg-gray-200 p-2 cursor-pointer"
-                      onClick={() => handleTimestampClick((entry.start))}
-                    >
-                      <span className="text-md text-blue-500">
-                        {new Date(entry.start * 1000).toISOString().substr(14, 5)}
-                      </span>
-                      {' - '}
-                      {entry.text}
-                    </div>
-                  ))}
+        {/* Results */}
+        {videoId && insights && (
+          <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+            {/* Left: video + transcript (sticky on desktop) */}
+            <div className="lg:sticky lg:top-6 space-y-4">
+              <div className="rounded-2xl overflow-hidden shadow-sm border border-slate-200 bg-black">
+                <div className="relative pb-[56.25%] h-0">
+                  <iframe
+                    key={videoId}
+                    src={`https://www.youtube.com/embed/${videoId}`}
+                    title="YouTube video player"
+                    frameBorder="0"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                    className="absolute top-0 left-0 w-full h-full"
+                  />
                 </div>
               </div>
-          </div>
 
-          {/* Sections */}
-          <div id = "output" className="md:col-span-1 space-y-6 h-[90vh] overflow-y-scroll">
-            {sectionOrder.map(sectionId => sections[sectionId])}
+              {!!transcript.length && (
+                <details className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden" open>
+                  <summary className="cursor-pointer select-none flex items-center gap-2 px-4 py-3 text-sm font-semibold text-slate-700">
+                    <FileTextIcon className="w-4 h-4 text-slate-400" /> Transcript
+                  </summary>
+                  <div className="max-h-64 overflow-y-auto px-2 pb-2 border-t border-slate-100">
+                    {transcript.map((entry, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => handleTimestampClick(entry.start)}
+                        className="w-full text-left flex gap-3 rounded-lg px-2 py-1.5 text-sm text-slate-600 hover:bg-slate-50"
+                      >
+                        <span className="text-xs font-medium text-indigo-500 pt-0.5 shrink-0 w-12">
+                          {formatTime(entry.start)}
+                        </span>
+                        <span>{entry.text}</span>
+                      </button>
+                    ))}
+                  </div>
+                </details>
+              )}
+
+              {reasoning && (
+                <details className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+                  <summary className="cursor-pointer select-none flex items-center gap-2 px-4 py-3 text-sm font-semibold text-slate-700">
+                    <BrainCircuit className="w-4 h-4 text-slate-400" /> View model reasoning
+                  </summary>
+                  <pre className="whitespace-pre-wrap break-words text-xs leading-relaxed text-slate-500 max-h-72 overflow-y-auto font-mono px-4 py-3 border-t border-slate-100">
+                    {reasoning}
+                  </pre>
+                </details>
+              )}
+            </div>
+
+            {/* Right: tabbed insights */}
+            <div className="rounded-2xl border border-slate-200 bg-white/60 shadow-sm p-4 sm:p-5">
+              <div className="flex flex-wrap gap-2 mb-4">
+                {TABS.map((tab) => {
+                  const Icon = tab.icon;
+                  const active = activeTab === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveTab(tab.id)}
+                      className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
+                        active ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'
+                      }`}
+                    >
+                      <Icon className="w-4 h-4" />
+                      {tab.label}
+                      {counts[tab.id] > 0 && (
+                        <span className={`ml-0.5 rounded-full px-1.5 text-xs ${active ? 'bg-white/20' : 'bg-slate-200 text-slate-600'}`}>
+                          {counts[tab.id]}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="lg:max-h-[72vh] lg:overflow-y-auto pr-0.5">{renderTab()}</div>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 };
 
 export default PersonalDevInsightsApp;
-
-
-
-// import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
-// import { Alert, AlertDescription } from "./components/ui/alert";
-
-// // Processing Step Component
-// const ProcessingStep = ({ title, description, isActive, isComplete }) => (
-//   <div className="flex items-center gap-3 mb-4">
-//     <div className={`w-8 h-8 rounded-full flex items-center justify-center
-//       ${isActive ? 'bg-blue-500 animate-pulse' : isComplete ? 'bg-green-500' : 'bg-gray-200'}`}>
-//       {isComplete ? (
-//         <div className="text-white">✓</div>
-//       ) : isActive ? (
-//         <Loader2 className="w-4 h-4 text-white animate-spin" />
-//       ) : (
-//         <div className="w-4 h-4" />
-//       )}
-//     </div>
-//     <div>
-//       <div className={`font-medium ${isActive ? 'text-blue-500' : isComplete ? 'text-green-500' : 'text-gray-500'}`}>
-//         {title}
-//       </div>
-//       <div className="text-sm text-gray-500">{description}</div>
-//     </div>
-//   </div>
-// );
-
-
-
-  // // Processing steps for loading state
-  // const processingSteps = [
-  //   {
-  //     title: "Fetching Video",
-  //     description: "Retrieving video information from YouTube"
-  //   },
-  //   {
-  //     title: "Generating Transcript",
-  //     description: "Converting speech to text"
-  //   },
-  //   {
-  //     title: "Processing Content",
-  //     description: "Analyzing transcript with AI"
-  //   },
-  //   {
-  //     title: "Generating Insights",
-  //     description: "Creating action steps and key takeaways"
-  //   }
-  // ];
-
-  // // YouTube Player Initialization
-  // // useEffect(() => {
-  // //   // Load YouTube iframe API if not already loaded
-  // //   if (!window.YT) {
-  // //     const tag = document.createElement('script');
-  // //     tag.src = "https://www.youtube.com/iframe_api";
-  // //     const firstScriptTag = document.getElementsByTagName('script')[0];
-  // //     firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
-  
-  // //     window.onYouTubeIframeAPIReady = () => {
-  // //       // Only create player if videoId is valid
-  // //       if (videoId && videoId.length === 11) {
-  // //         createPlayer();
-  // //       }
-  // //     };
-  // //   } else if (videoId && videoId.length === 11) {
-  // //     createPlayer();
-  // //   }
-  // // }, [videoId]);
-
-  // // Create YouTube Player
-  // const createPlayer = () => {
-  //   if (window.YT && videoId) {
-  //     try {
-  //       const player = new window.YT.Player('youtube-player', {
-  //         height: '390',
-  //         width: '640',
-  //         videoId: videoId,
-  //         playerVars: {
-  //           'playsinline': 1
-  //         },
-  //         events: {
-  //           'onReady': (event) => {
-  //             console.log('YouTube Player is ready');
-  //             setYoutubePlayer(event.target);
-  //           },
-  //           'onError': (error) => {
-  //             console.error('YouTube Player Error:', error);
-  //           }
-  //         }
-  //       });
-  //     } catch (error) {
-  //       console.error('Error creating YouTube Player:', error);
-  //     }
-  //   }
-  // };
