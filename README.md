@@ -1,70 +1,88 @@
-# Getting Started with Create React App
+# YouTube Key Takeaways
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+Paste a YouTube video URL and get an AI-distilled breakdown of it: action steps,
+key insights, notable examples, and a summary — each linked to the exact moment
+in the video. Built for personal-development talks, but works on any video with
+a transcript.
 
-## Available Scripts
+- **Frontend:** React (Create React App) + Tailwind CSS
+- **Backend:** Flask API that fetches the transcript and runs it through a
+  two-pass Claude pipeline (extractor → verifier) for grounded takeaways.
 
-In the project directory, you can run:
+## How it works
 
-### `npm start`
+1. The frontend extracts the video ID from the URL and calls `POST /transcribe`.
+2. The backend fetches the transcript via `youtube-transcript-api`.
+3. The frontend sends the transcript to `POST /process-transcript`.
+4. The backend runs a two-pass Claude pipeline (see [backend/transcript_processor.py](backend/transcript_processor.py)):
+   - **Extractor** — Claude (Sonnet 4.6) reads the full timestamped transcript
+     with *adaptive thinking* and *structured outputs*, extracting candidate
+     action steps, insights, and examples, each cited with a timestamp, segment
+     IDs, and a verbatim evidence quote. Tuned for recall.
+   - **Verifier** — a second pass audits every candidate against the transcript,
+     drops anything whose evidence isn't literally present, dedupes, ranks, and
+     writes the final summary. The transcript is prompt-cached so this pass is
+     cheap. Very long videos use map-reduce (extract per chunk, verify globally).
+   - A literal-evidence post-check runs as a final hallucination safety net.
+5. Results render alongside an embedded player; clicking any timestamp seeks the
+   video to that moment.
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+## Prerequisites
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+- Node.js 18+
+- Python 3.11+
+- An Anthropic API key — https://console.anthropic.com/settings/keys
 
-### `npm test`
+## Setup
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+### Backend
 
-### `npm run build`
+```bash
+cd backend
+python -m venv venv          # or reuse the existing ../venv
+source venv/bin/activate
+pip install -r ../requirements.txt
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+cp .env.example .env         # then add your ANTHROPIC_API_KEY
+python app.py                # serves http://127.0.0.1:5000
+```
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+Endpoints:
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+| Method | Path                  | Purpose                                  |
+| ------ | --------------------- | ---------------------------------------- |
+| GET    | `/health`             | Liveness check                           |
+| POST   | `/transcribe`         | `{ "YouTubeVideoID": "..." }` → transcript |
+| POST   | `/process-transcript` | `{ "transcript": [...] }` → AI insights  |
 
-### `npm run eject`
+### Frontend
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+```bash
+npm install
+cp .env.example .env         # optional; defaults to http://127.0.0.1:5000
+npm start                    # opens http://localhost:3000
+```
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+## Configuration
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+| Variable                  | Where    | Default                 | Purpose                              |
+| ------------------------- | -------- | ----------------------- | ------------------------------------ |
+| `ANTHROPIC_API_KEY`       | backend  | —                       | Claude API key (required for AI)     |
+| `CLAUDE_MODEL`            | backend  | `claude-sonnet-4-6`     | Model id (`claude-opus-4-8` for quality, `claude-haiku-4-5` for cost) |
+| `CLAUDE_MAX_OUTPUT_TOKENS`| backend  | `16000`                 | Per-call output budget (incl. thinking) |
+| `CLAUDE_EFFORT`           | backend  | `medium`                | Reasoning effort: `low`/`medium`/`high`/`max` (higher = better but slower) |
+| `ALLOWED_ORIGINS`         | backend  | `http://localhost:3000` | Comma-separated CORS origins         |
+| `PORT`                    | backend  | `5000`                  | Port the Flask server binds to       |
+| `REACT_APP_API_BASE_URL`  | frontend | `http://127.0.0.1:5000` | Backend base URL                     |
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+> **macOS note:** Port 5000 is used by AirPlay Receiver. Either disable it
+> (System Settings → General → AirDrop & Handoff → AirPlay Receiver) or run the
+> backend on another port with `PORT=5001` and set
+> `REACT_APP_API_BASE_URL=http://127.0.0.1:5001`.
 
-## Learn More
+## Notes
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
-
-### Code Splitting
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
-
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+- `backend/sections.py` is a standalone experimental NLP script (spaCy / BART)
+  that is **not** part of the web app and is not covered by `requirements.txt`.
+- Transcript fetching depends on YouTube's public transcript endpoints, which
+  may rate-limit or block server IPs on some hosting providers.

@@ -1,34 +1,44 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState } from 'react';
 import axios from 'axios';
 import './search.css';
-import { 
-  BookmarkIcon, 
-  PlayIcon, 
-  LightbulbIcon, 
-  ClockIcon,
+import {
+  BookmarkIcon,
+  LightbulbIcon,
   FileTextIcon,
-  YoutubeIcon,
-  Loader2,
-  BrainCircuit,
-  ListTodo,
   Quote,
   Search,
   MenuIcon,
-  StarIcon
+  Loader2,
+  BrainCircuit
 } from 'lucide-react';
+
+// Base URL of the Flask backend. Override per-environment with
+// REACT_APP_API_BASE_URL (e.g. in a .env file or your deploy config).
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:5000';
+
+// Models / thinking levels the user can choose (must match the backend allowlist).
+const MODELS = [
+  { value: 'claude-sonnet-4-6', label: 'Sonnet 4.6 · balanced' },
+  { value: 'claude-opus-4-8', label: 'Opus 4.8 · best quality' },
+];
+const EFFORTS = [
+  { value: 'low', label: 'Low · fastest' },
+  { value: 'medium', label: 'Medium · balanced' },
+  { value: 'high', label: 'High · most thorough' },
+];
 
 
 const PersonalDevInsightsApp = () => {
   const [videoUrl, setVideoUrl] = useState('');
   const [videoId, setVideoId] = useState('');
-  const [loading, setLoading] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const [currentStep, setCurrentStep] = useState(0);
-  const [transcriptText, setTranscriptText] = useState('');
   const [transcript, setTranscript] = useState([]);
   const [insights, setInsights] = useState(null);
-  const [youtubePlayer, setYoutubePlayer] = useState(null);
+  const [model, setModel] = useState(MODELS[0].value);
+  const [effort, setEffort] = useState('medium');
+  const [reasoning, setReasoning] = useState('');   // live thinking text
+  const [stage, setStage] = useState('');           // current pipeline stage label
 
 
   // Extract YouTube Video ID
@@ -41,11 +51,11 @@ const PersonalDevInsightsApp = () => {
   // Handle Video Submission
   const handleVideoSubmission = async (event) => {
     event.preventDefault();
-    setLoading(true);
     setError('');
-    setTranscriptText('');
     setInsights(null);
-  
+    setReasoning('');
+    setStage('');
+
     try {
       setIsLoading(true);
       const extractedVideoId = extractVideoId(videoUrl);
@@ -53,9 +63,10 @@ const PersonalDevInsightsApp = () => {
         throw new Error('Invalid YouTube URL');
       }
       setVideoId(extractedVideoId);
-  
+
+      setStage('Fetching transcript…');
       const transcribeResponse = await axios.post(
-        'http://127.0.0.1:5000/transcribe',
+        `${API_BASE_URL}/transcribe`,
         { YouTubeVideoID: extractedVideoId }
       );
       
@@ -76,36 +87,60 @@ const PersonalDevInsightsApp = () => {
       
       console.log("Mapped Transcript Data:", transcriptData);
       
-      const processResponse = await axios.post(
-        'http://127.0.0.1:5000/process-transcript',
-        { transcript: transcriptData },
-        {
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          withCredentials: true
-        }
-      );
-    
-      if (processResponse.status !== 200) {
+      // Stream the analysis (Server-Sent Events) so we can show Claude's
+      // reasoning live instead of staring at empty space.
+      const processResponse = await fetch(`${API_BASE_URL}/process-transcript`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ transcript: transcriptData, model, effort }),
+      });
+
+      if (!processResponse.ok || !processResponse.body) {
         throw new Error('Failed to process transcript.');
       }
-    
-      const analysisData = processResponse.data;
-    
-      if (analysisData.status === 'success') {
-        setInsights({
-          actionSteps: analysisData.data.action_steps.map((step) => ({
-            action: step.action,
-            explanation: step.explanation,
-            timestamp: step.timestamp,
-          })),
-          keyInsights: analysisData.data.key_insights || [],
-          importantExamples: analysisData.data.examples || [],
-          summary: analysisData.data.summary || '',
-        });
-      } else {
-        throw new Error(analysisData.message || 'Failed to process transcript.');
+
+      const reader = processResponse.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let gotResult = false;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        let sep;
+        while ((sep = buffer.indexOf('\n\n')) !== -1) {
+          const frame = buffer.slice(0, sep).trim();
+          buffer = buffer.slice(sep + 2);
+          if (!frame.startsWith('data:')) continue;
+
+          const ev = JSON.parse(frame.slice(5).trim());
+          if (ev.type === 'status') {
+            setStage(ev.label);
+          } else if (ev.type === 'thinking') {
+            setReasoning((prev) => prev + ev.text);
+          } else if (ev.type === 'result') {
+            gotResult = true;
+            const d = ev.data;
+            setInsights({
+              actionSteps: (d.action_steps || []).map((step) => ({
+                action: step.action,
+                explanation: step.explanation,
+                timestamp: step.timestamp,
+              })),
+              keyInsights: d.key_insights || [],
+              importantExamples: d.examples || [],
+              summary: d.summary || '',
+            });
+          } else if (ev.type === 'error') {
+            throw new Error(ev.message || 'Failed to process transcript.');
+          }
+        }
+      }
+
+      if (!gotResult) {
+        throw new Error('The model did not return any analysis.');
       }
     } catch (error) {
       console.error('Error details:', {
@@ -115,7 +150,6 @@ const PersonalDevInsightsApp = () => {
       });
       setError(error.message || 'An error occurred while processing your request.');
     } finally {
-      setLoading(false);
       setIsLoading(false);
     }
   };
@@ -130,13 +164,6 @@ const PersonalDevInsightsApp = () => {
     if (iframe) {
       // Modify the src to include the start time and autoplay
       iframe.src = `https://www.youtube.com/embed/${videoId}?start=${startTime}&autoplay=1`;
-    }
-  };
- 
-  const handleTranscriptClick = (time) => {
-    if (youtubePlayer) {
-      youtubePlayer.seekTo(time, true);
-      youtubePlayer.playVideo();
     }
   };
 
@@ -367,12 +394,74 @@ const PersonalDevInsightsApp = () => {
             </div>
           </div>
       </div>
+
+        {/* Model + thinking-level controls */}
+        <div className="flex items-center justify-center gap-4 mt-4 text-sm text-neutral-700">
+          <label className="flex items-center gap-2">
+            <span className="font-medium">Model</span>
+            <select
+              value={model}
+              onChange={(e) => setModel(e.target.value)}
+              disabled={isLoading}
+              className="bg-white rounded-md px-3 py-1.5 shadow-sm focus:outline-none disabled:opacity-60"
+            >
+              {MODELS.map((m) => (
+                <option key={m.value} value={m.value}>{m.label}</option>
+              ))}
+            </select>
+          </label>
+          <label className="flex items-center gap-2">
+            <span className="font-medium">Thinking</span>
+            <select
+              value={effort}
+              onChange={(e) => setEffort(e.target.value)}
+              disabled={isLoading}
+              className="bg-white rounded-md px-3 py-1.5 shadow-sm focus:outline-none disabled:opacity-60"
+            >
+              {EFFORTS.map((x) => (
+                <option key={x.value} value={x.value}>{x.label}</option>
+              ))}
+            </select>
+          </label>
+        </div>
+
         {error && (
           <div className="text-red-500 mt-2 flex justify-center">
             {error}
           </div>
         )}
       </section>
+
+      {/* Live reasoning — shows Claude's thinking while it works, instead of blank space */}
+      {isLoading && (
+        <div className="max-w-3xl mx-auto mb-8">
+          <div className="bg-white/90 rounded-xl shadow-md p-5">
+            <div className="flex items-center text-sm font-semibold text-neutral-700 mb-3">
+              <Loader2 className="w-4 h-4 mr-2 animate-spin text-blue-500" />
+              {stage || 'Working…'}
+            </div>
+            {reasoning ? (
+              <pre className="whitespace-pre-wrap break-words text-xs leading-relaxed text-neutral-600 max-h-72 overflow-y-auto font-mono">
+                {reasoning}
+              </pre>
+            ) : (
+              <p className="text-xs text-neutral-400">Claude is thinking…</p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Collapsible reasoning once results are in */}
+      {!isLoading && insights && reasoning && (
+        <details className="max-w-3xl mx-auto mb-6">
+          <summary className="cursor-pointer text-sm font-medium text-neutral-600 flex items-center gap-2">
+            <BrainCircuit className="w-4 h-4" /> View model reasoning
+          </summary>
+          <pre className="whitespace-pre-wrap break-words text-xs leading-relaxed text-neutral-500 mt-2 max-h-72 overflow-y-auto font-mono bg-white/80 rounded-lg p-4">
+            {reasoning}
+          </pre>
+        </details>
+      )}
 
       {videoId && insights && (
         <div className="child grid grid-cols-1 md:grid-cols-2 gap-6 pb-10">
